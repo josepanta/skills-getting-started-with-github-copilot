@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let participantsHtml = "";
         if (Array.isArray(details.participants) && details.participants.length > 0) {
           const itemsHtml = details.participants
-            .map((email) => `<li class="participant-item">${email}</li>`)
+            .map((email) => `<li class="participant-item">${email}<button class=\"delete-participant remove-button\" data-activity=\"${name}\" data-email=\"${email}\" title=\"Unregister participant\">\uD83D\uDDD1\uFE0F</button></li>`)
             .join("");
           participantsHtml = `
             <div class="participants-section">
@@ -55,6 +55,8 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         activitiesList.appendChild(activityCard);
+
+        // Attach delete handler via event delegation at the list level — handled below. No action needed here.
 
         // Add option to select dropdown
         const option = document.createElement("option");
@@ -112,4 +114,47 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize app
   fetchActivities();
+
+  // Handle delete/unregister button via event delegation
+  activitiesList.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!target.matches(".delete-participant")) return;
+
+    const activity = target.dataset.activity;
+    const email = target.dataset.email;
+
+    if (!activity || !email) return;
+
+    // Ask for confirmation
+    const confirmed = confirm(`Unregister ${email} from ${activity}?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/participants?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const result = await response.json();
+
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        // Refresh activities so the removed participant disappears
+        await fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "An error occurred";
+        messageDiv.className = "error";
+      }
+
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+    } catch (error) {
+      messageDiv.textContent = "Failed to unregister participant. Please try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
+    }
+  });
 });
